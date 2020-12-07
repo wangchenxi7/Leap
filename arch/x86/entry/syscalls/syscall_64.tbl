@@ -336,6 +336,11 @@
 326 	common	is_session_create	sys_is_session_create
 327	common	is_request		sys_is_request
 
+# on-demand swap-in counting
+328	common	reset_swap_stats	sys_reset_swap_stats
+329	common	get_swap_stats		sys_get_swap_stats
+330	common	get_leap_stats		sys_get_leap_stats
+
 #
 # x32-specific system call numbers start at 512 to avoid cache impact
 # for native 64-bit operation.

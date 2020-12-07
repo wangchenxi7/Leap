@@ -21,6 +21,10 @@
 
 #include <asm/pgtable.h>
 
+// on-demand swap-in counting
+#include <linux/swap_stats.h>
+#include <linux/page_idle.h>
+
 /*
  * swapper_space is a fiction, retained to simplify the path through
  * vmscan's shrink_page_list.
@@ -107,8 +111,8 @@ void inc_head(void) {
 void inc_size(void) {
     int current_size = atomic_read(&trend_history.size);
     int max_size = atomic_read(&trend_history.max_size);
-    
-    if(current_size < max_size) 
+
+    if(current_size < max_size)
         atomic_inc(&trend_history.size);
 }
 
@@ -124,28 +128,28 @@ void init_stat(void) {
 }
 
 void init_swap_trend(int size) {
-	
+
 	trend_history.history = (struct swap_entry *) kzalloc(size * sizeof(struct swap_entry), GFP_KERNEL);
 	atomic_set(&trend_history.head, 0);
 	atomic_set(&trend_history.size, 0);
 	atomic_set(&trend_history.max_size , size);
-	
+
 	init_stat();
 	printk("swap_trend history initiated for size: %d, head at: %d, curresnt_size: %d\n", atomic_read(&trend_history.max_size), atomic_read(&trend_history.head), atomic_read(&trend_history.size));
 }
 EXPORT_SYMBOL(init_swap_trend);
 
 void log_swap_trend(unsigned long entry) {
-	
+
 	long offset_delta;
 	int prev_index;
 	struct swap_entry se;
 	if(atomic_read(&trend_history.size)) {
 		prev_index = get_prev_index(atomic_read(&trend_history.head));
 		offset_delta = entry - trend_history.history[prev_index].entry;
-		
+
 		//printk("prev_index:%ld, offset_delta:%ld\n", prev_index, offset_delta);
-		
+
 		se.delta = offset_delta;
 		se.entry = entry;
 	}
@@ -153,7 +157,7 @@ void log_swap_trend(unsigned long entry) {
 	    se.delta = 0;
 	    se.entry = entry;
 	}
-	
+
 	trend_history.history[atomic_read(&trend_history.head)] = se;
 	inc_head();
 	inc_size();
@@ -162,7 +166,7 @@ void log_swap_trend(unsigned long entry) {
 int find_trend_in_region(int size, long *major_delta, int *major_count) {
     int maj_index = get_prev_index(atomic_read(&trend_history.head)), count, i, j;
     long candidate;
-    
+
     for (i = get_prev_index(maj_index), j = 1, count = 1; j < size; i = get_prev_index(i), j++) {
         if (trend_history.history[maj_index].delta == trend_history.history[i].delta)
             count++;
@@ -173,13 +177,13 @@ int find_trend_in_region(int size, long *major_delta, int *major_count) {
             count = 1;
         }
     }
-    
+
     candidate = trend_history.history[maj_index].delta;
     for (i = get_prev_index(atomic_read(&trend_history.head)), j = 0, count = 0; j < size; i = get_prev_index(i), j++) {
         if(trend_history.history[i].delta == candidate)
             count++;
     }
-    
+
     //printk("majority index: %d, candidate: %ld, count:%d\n", maj_index, candidate, count);
     *major_delta = candidate;
     *major_count = count;
@@ -189,7 +193,7 @@ int find_trend_in_region(int size, long *major_delta, int *major_count) {
 int find_trend (int *depth, long *major_delta, int *major_count) {
     	int has_trend = 0, size = (int) atomic_read(&trend_history.max_size)/4, max_size;
 	max_size = size * 4;
-	
+
 	while(has_trend == 0 && size <= max_size) {
 		has_trend = find_trend_in_region(size, major_delta, major_count);
 		//printk( "at size: %d, trend found? %s\n", size, (has_trend == 0) ? "false" : "true" );
@@ -300,7 +304,7 @@ void __delete_from_swap_cache(struct page *page)
  * @page: page we want to move to swap
  *
  * Allocate swap space for the page and add the page to the
- * swap cache.  Caller needs to hold the page lock. 
+ * swap cache.  Caller needs to hold the page lock.
  */
 int add_to_swap(struct page *page, struct list_head *list)
 {
@@ -369,9 +373,9 @@ void delete_from_swap_cache(struct page *page)
 	page_cache_release(page);
 }
 
-/* 
- * If we are the only user, then try to free up the swap cache. 
- * 
+/*
+ * If we are the only user, then try to free up the swap cache.
+ *
  * Its ok to check for PageSwapCache without the page lock
  * here because we are going to recheck again inside
  * try_to_free_swap() _with_ the lock.
@@ -385,7 +389,7 @@ static inline void free_swap_cache(struct page *page)
 	}
 }
 
-/* 
+/*
  * Perform a free_page(), also freeing any swap cache associated with
  * this page if it is the last user of the page.
  */
@@ -421,7 +425,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 	struct page *page;
 
 	page = find_get_page(swap_address_space(entry), entry.val);
-	
+
 	if( get_custom_prefetch() != 0 ) {
 		log_swap_trend(swp_offset(entry));
 	}
@@ -430,7 +434,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 		INC_CACHE_INFO(find_success);
 		if (TestClearPageReadahead(page)) {
 			atomic_inc(&swapin_readahead_hits);
-			
+
 			if( get_custom_prefetch() != 0 ) {
 				atomic_inc(&my_swapin_readahead_hits);
 			}
@@ -558,7 +562,7 @@ EXPORT_SYMBOL(add_page_to_buffer);
     return;
 } */
 
-void prefetch_buffer_init(unsigned long _size){	
+void prefetch_buffer_init(unsigned long _size){
 	printk("%s: initiating prefetch buffer with size %ld!\n",__func__, _size);
 	if (!_size || _size <= 0) {
 		printk("%s: invalid buffer size\n",__func__);
@@ -571,7 +575,7 @@ void prefetch_buffer_init(unsigned long _size){
 	atomic_set(&prefetch_buffer.head, 0);
 	atomic_set(&prefetch_buffer.tail, 0);
 	atomic_set(&prefetch_buffer.size, 0);
-	
+
 	printk("%s: prefetch buffer initiated with size: %d, head at: %d, tail at: %d\n", __func__, get_buffer_size(), get_buffer_head(), get_buffer_tail());
 	return;
 }
@@ -694,6 +698,29 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 	return retpage;
 }
 
+// on-demand swap-in counting
+struct page *read_swap_cache_async_profiling(swp_entry_t entry, gfp_t gfp_mask,
+			struct vm_area_struct *vma, unsigned long addr, bool ondemand)
+{
+	bool page_was_allocated;
+	struct page *retpage = __read_swap_cache_async(entry, gfp_mask,
+			vma, addr, &page_was_allocated);
+
+	if (page_was_allocated) {
+		swap_readpage(retpage);
+
+		// For profiling
+		if (ondemand) {
+			ondemand_swapin_inc();
+		} else {
+			set_page_idle(retpage); // Reuse the idle bit to detect if page is touched
+			prefetch_swapin_inc();
+		}
+	}
+
+	return retpage;
+}
+
 static unsigned long swapin_nr_pages(unsigned long offset)
 {
 	static unsigned long prev_offset;
@@ -760,13 +787,16 @@ static unsigned long swapin_nr_pages(unsigned long offset)
 struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 			struct vm_area_struct *vma, unsigned long addr)
 {
-	struct page *page;
+	struct page *page, *fault_page;
 	unsigned long entry_offset = swp_offset(entry);
 	unsigned long offset = entry_offset;
 	unsigned long start_offset, end_offset;
 	unsigned long mask;
 	struct blk_plug plug;
-	
+
+	// on-demand swap-in counting
+	fault_page = read_swap_cache_async_profiling(entry, gfp_mask, vma, addr, true);
+
 	mask = swapin_nr_pages(offset) - 1;
 	atomic_inc(&swapin_readahead_entry);
 
@@ -782,9 +812,12 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 
 			//blk_start_plug(&plug);
         		for (offset = start_offset; count <= mask; offset+= major_delta, count++) {
+				if (offset == entry_offset) {
+					continue;
+				}
 		                /* Ok, do the async read-ahead now */
-                		page = read_swap_cache_async(swp_entry(swp_type(entry), offset),
-                                                gfp_mask, vma, addr);
+                		page = read_swap_cache_async_profiling(swp_entry(swp_type(entry), offset),
+                                                gfp_mask, vma, addr, offset == entry_offset);
                 		if (!page)
                         		continue;
                 		if (offset != entry_offset)
@@ -794,7 +827,7 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 			//blk_finish_plug(&plug);
 
 			lru_add_drain();
-			goto skip; 
+			goto skip;
 		}
 		else
 			goto usual;
@@ -811,9 +844,13 @@ usual:
 
 	blk_start_plug(&plug);
 	for (offset = start_offset; offset <= end_offset ; offset++) {
+		// on-demand swap-in counting
+		if (offset == entry_offset) {
+ 			continue;
+ 		}
 		/* Ok, do the async read-ahead now */
-		page = read_swap_cache_async(swp_entry(swp_type(entry), offset),
-						gfp_mask, vma, addr);
+		page = read_swap_cache_async_profiling(swp_entry(swp_type(entry), offset),
+						gfp_mask, vma, addr, offset == entry_offset);
 		if (!page)
 			continue;
 		if (offset != entry_offset)
@@ -824,5 +861,29 @@ usual:
 
 	lru_add_drain();	/* Push any new pages onto the LRU now */
 skip:
-	return read_swap_cache_async(entry, gfp_mask, vma, addr);
+	return fault_page;
+}
+
+// YIFAN added for profiling
+int inner_get_leap_stats(long *tot_sc_pages,
+			 long *sc_add, long *sc_del,
+			 long *sc_find_succ, long *sc_find_tot,
+			 long *free_swap, long *total_swap,
+			 long *swap_rdahd_hit, long *trd_found,
+			 long *swap_rdahd_entry)
+{
+	*tot_sc_pages = total_swapcache_pages();
+
+	*sc_add = swap_cache_info.add_total;
+	*sc_del = swap_cache_info.del_total;
+	*sc_find_succ = swap_cache_info.find_success;
+	*sc_find_tot = swap_cache_info.find_total;
+
+	*free_swap = get_nr_swap_pages() << (PAGE_SHIFT - 10);
+	*total_swap = total_swap_pages << (PAGE_SHIFT - 10);
+
+	*swap_rdahd_hit = atomic_read(&my_swapin_readahead_hits);
+	*trd_found = atomic_read(&trend_found);
+	*swap_rdahd_entry = atomic_read(&swapin_readahead_entry);
+	return 0;
 }

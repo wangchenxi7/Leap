@@ -914,7 +914,9 @@ export mod_sign_cmd
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ leap/
+# add functionality of on-demand swap-in countting based on yifan's code for ADC
+#core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ leap/
+core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ leap/ extended_syscalls/
 
 vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \

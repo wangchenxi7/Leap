@@ -72,6 +72,10 @@
 #include <linux/syscalls.h>
 #include "internal.h"
 
+// on-demand swap-in counting
+#include <linux/swap_stats.h>
+#include <linux/page_idle.h>
+
 #if defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS) && !defined(CONFIG_COMPILE_TEST)
 #warning Unfortunate NUMA and NUMA Balancing config, growing page-frame for last_cpupid.
 #endif
@@ -2501,7 +2505,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		goto out;
 
 	entry = pte_to_swp_entry(orig_pte);
-	
+
 	if (unlikely(non_swap_entry(entry))) {
 		if (is_migration_entry(entry)) {
 			migration_entry_wait(mm, pmd, address);
@@ -2516,6 +2520,16 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
 	page = lookup_swap_cache(entry);
+
+	// on-demand swap-in counting
+	// Profiling swap stats. Case 1) page in swap cache
+	if (page) {
+		if (page_is_idle(page)) {
+			clear_page_idle(page); // Make sure to count only once
+			// Hit on swap cache (include ondemand pages and prefetched pages)
+			hit_on_swap_cache_inc();
+		}
+	}
 
 	if (!page) {
 		page = swapin_readahead(entry,
@@ -2647,7 +2661,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, page_table);
-	
+
 unlock:
 	pte_unmap_unlock(page_table, ptl);
 out:

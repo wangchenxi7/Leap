@@ -14,9 +14,12 @@ ifdef CONFIG_CROSS_MEMORY_ATTACH
 mmu-$(CONFIG_MMU)	+= process_vm_access.o
 endif
 
+# add swap_stats.o, for on-demand swap-in counting
 obj-y			:= filemap.o mempool.o oom_kill.o \
 			   maccess.o page_alloc.o page-writeback.o \
-			   readahead.o swap.o truncate.o vmscan.o shmem.o \
+			   readahead.o swap.o \
+			   swap_stats.o \
+			   truncate.o vmscan.o shmem.o \
 			   util.o mmzone.o vmstat.o backing-dev.o \
 			   mm_init.o mmu_context.o percpu.o slab_common.o \
 			   compaction.o vmacache.o \
