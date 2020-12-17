@@ -899,10 +899,5 @@ asmlinkage int sys_reset_swap_stats(void);
 asmlinkage int sys_get_swap_stats(int __user *on_demand_swapin_num,
 				  int __user *prefetch_swapin_num,
 				  int __user *hiton_swap_cache_num);
-asmlinkage int sys_get_leap_stats(long __user *tot_sc_pages,
-				  long __user *sc_add, long __user *sc_del,
-				  long __user *sc_find_succ, long __user *sc_find_tot,
-				  long __user *free_swap, long __user *total_swap,
-				  long __user *swap_rdahd_hit, long __user *trend_found,
-				  long __user *swap_rdahd_entry);
+asmlinkage int sys_get_leap_stats(long __user *stats_buf);
 #endif

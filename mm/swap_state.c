@@ -73,6 +73,11 @@ atomic_t my_swapin_readahead_hits = ATOMIC_INIT(0);
 atomic_t swapin_readahead_entry = ATOMIC_INIT(0);
 atomic_t trend_found = ATOMIC_INIT(0);
 
+// // [ADC] sample page fault trace
+// atomic_t trace_sample_cnt = ATOMIC_INIT(0);
+// #define TOTAL_PERIOD (100 * 1000 * 1000)
+// #define SAMPLE_PERIOD (200 * 1000)
+
 void set_custom_prefetch(unsigned long val){
         is_custom_prefetch = val;
         printk("custom prefetch: %s\n", (is_custom_prefetch != 0) ? "set" : "clear" );
@@ -161,6 +166,11 @@ void log_swap_trend(unsigned long entry) {
 	trend_history.history[atomic_read(&trend_history.head)] = se;
 	inc_head();
 	inc_size();
+
+	// atomic_inc(&trace_sample_cnt);
+	// if (atomic_read(&trace_sample_cnt) % TOTAL_PERIOD < SAMPLE_PERIOD) {
+	// 	trace_printk("%ld\t%lu\n", se.delta, se.entry);
+	// }
 }
 
 int find_trend_in_region(int size, long *major_delta, int *major_count) {
@@ -864,26 +874,21 @@ skip:
 	return fault_page;
 }
 
-// YIFAN added for profiling
-int inner_get_leap_stats(long *tot_sc_pages,
-			 long *sc_add, long *sc_del,
-			 long *sc_find_succ, long *sc_find_tot,
-			 long *free_swap, long *total_swap,
-			 long *swap_rdahd_hit, long *trd_found,
-			 long *swap_rdahd_entry)
+// [ADC] YIFAN added for profiling
+int inner_get_leap_stats(long *stats_buf)
 {
-	*tot_sc_pages = total_swapcache_pages();
+	stats_buf[0] = total_swapcache_pages(); // total swap cache pages
 
-	*sc_add = swap_cache_info.add_total;
-	*sc_del = swap_cache_info.del_total;
-	*sc_find_succ = swap_cache_info.find_success;
-	*sc_find_tot = swap_cache_info.find_total;
+	stats_buf[1] = swap_cache_info.add_total; // swap cache add
+	stats_buf[2] = swap_cache_info.del_total; // swap cache del
+	stats_buf[3] = swap_cache_info.find_success; // swap cache find success
+	stats_buf[4] = swap_cache_info.find_total; // swap cache find total
 
-	*free_swap = get_nr_swap_pages() << (PAGE_SHIFT - 10);
-	*total_swap = total_swap_pages << (PAGE_SHIFT - 10);
+	stats_buf[5] = get_nr_swap_pages() << (PAGE_SHIFT - 10); // free swap
+	stats_buf[6] = total_swap_pages << (PAGE_SHIFT - 10); // total swap
 
-	*swap_rdahd_hit = atomic_read(&my_swapin_readahead_hits);
-	*trd_found = atomic_read(&trend_found);
-	*swap_rdahd_entry = atomic_read(&swapin_readahead_entry);
+	stats_buf[7] = atomic_read(&my_swapin_readahead_hits); // swap readahead hit
+	stats_buf[8] = atomic_read(&trend_found); // trend found
+	stats_buf[9] = atomic_read(&swapin_readahead_entry); // swap readahead entry
 	return 0;
 }

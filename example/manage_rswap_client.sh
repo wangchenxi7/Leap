@@ -89,6 +89,14 @@ then
 
 	/mnt/ssd/yifan/code/Leap/example/syscaller
 
+elif [ "${action}" = "create" ]
+then
+	echo "Close current swap partition && Create swap file"
+	close_swap_partition
+
+	create_swap_file
+
+
 elif [ "${action}" = "uninstall" ]
 then
 	echo "Close current swap partition"

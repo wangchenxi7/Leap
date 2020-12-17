@@ -415,12 +415,7 @@ extern struct page *swapin_readahead(swp_entry_t, gfp_t,
 			struct vm_area_struct *vma, unsigned long addr);
 // [Leap] Added by YIFAN. get leap profile stats
 extern void init_stat(void);
-extern int inner_get_leap_stats(long *tot_sc_pages,
-				long *sc_add, long *sc_del,
-				long *sc_find_succ, long *sc_find_tot,
-				long *free_swap, long *total_swap,
-				long *swap_rdahd_hit, long *trend_found,
-				long *swap_rdahd_entry);
+extern int inner_get_leap_stats(long *stats_buf);
 /* linux/mm/swapfile.c */
 extern atomic_long_t nr_swap_pages;
 extern long total_swap_pages;
