@@ -717,6 +717,9 @@ struct page *read_swap_cache_async_profiling(swp_entry_t entry, gfp_t gfp_mask,
 			vma, addr, &page_was_allocated);
 
 	if (page_was_allocated) {
+		if (get_prefetch_buffer_status() != 0) {
+			add_page_to_buffer(entry, retpage);
+		}
 		swap_readpage(retpage);
 
 		// For profiling
