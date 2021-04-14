@@ -337,9 +337,9 @@
 327	common	is_request		sys_is_request
 
 # on-demand swap-in counting
-328	common	reset_swap_stats	sys_reset_swap_stats
-329	common	get_swap_stats		sys_get_swap_stats
-330	common	get_leap_stats		sys_get_leap_stats
+451	common	reset_swap_stats	sys_reset_swap_stats
+452	common	get_swap_stats		sys_get_swap_stats
+453	common	get_leap_stats		sys_get_leap_stats
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact
