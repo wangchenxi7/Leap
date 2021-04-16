@@ -4,11 +4,13 @@
 # Macro define
 
 # The swap file/partition size should be equal to the whole size of remote memory
-SWAP_PARTITION_SIZE="32G"
+SWAP_PARTITION_SIZE="48G"
 
 # Cause of sudo, NOT use ${HOME}
-home_dir="/mnt/ssd/yifan"
+home_dir="/mnt/ssd/nvme"
 swap_file="${home_dir}/swapfile"
+connect_exe="${home_dir}/Leap/example/connect_to_server.o"
+leap_ko="${home_dir}/Leap/example/leap_functionality.ko"
 
 ##
 # Do the action
@@ -19,7 +21,7 @@ then
 	echo "This shellscipt for Infiniswap pre-configuration."
 	echo "Run it with sudo or root"
 	echo ""
-	echo "Pleaes slect what to do: [install | uninstall]"
+	echo "Pleaes slect what to do: [install | create (create swapfile) | use-leap | use-kernel-default | add-pid | uninstall]"
 
 	read action
 fi
@@ -80,6 +82,20 @@ function create_swap_file () {
 }
 
 
+
+function connect_to_server () {
+	if [ -z "${connect_exe}" ]
+	then
+		echo "Compile the connect syscall"
+		gcc ${home_dir}/Leap/example/syscaller.c  -o ${home_dir}/Leap/example/connect_to_server.o
+	fi
+
+	# Connect to memory server
+	echo "${connect_exe}"
+	`${connect_exe}`
+}
+
+
 if [ "${action}" = "install" ]
 then
 	echo "Close current swap partition && Create swap file"
@@ -87,7 +103,7 @@ then
 
 	create_swap_file
 
-	/mnt/ssd/yifan/code/Leap/example/syscaller
+	connect_to_server
 
 elif [ "${action}" = "create" ]
 then
@@ -96,6 +112,22 @@ then
 
 	create_swap_file
 
+elif [ "${action}" = "use-leap" ]
+then
+  echo "Use the leap prefetcher"
+  sudo insmod ${leap_ko} cmd="prefetch" && sudo rmmod ${leap_ko}
+
+
+elif [ "${action}" = "use-kernel-default" ]
+then
+  echo "Use the kernel default prefetcher"
+  sudo insmod ${leap_ko} cmd="readahead" && sudo rmmod ${leap_ko}
+
+
+elif [ "${action}" = "add-pid" ]
+then
+  echo "Add the application to Leap"
+  sudo insmod ${leap_ko} process_name="java" cmd="init" && sudo rmmod ${leap_ko}
 
 elif [ "${action}" = "uninstall" ]
 then

@@ -4,8 +4,8 @@
 
 int main() {
 	int is_session_create = 326;
-	char *ipaddr = "rdma://1,10.0.0.4:9400";
+	char *ipaddr = "rdma://1,10.0.10.10:9400";
 
-	syscall(sys_is_session_create, ipaddr);
+	syscall(is_session_create, ipaddr);
 	return 0;
 }

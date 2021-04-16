@@ -84,7 +84,7 @@
 #define QUEUE_NUM_MASK	0x001f	//used in addr->(mapping)-> rdma_queue in IS_main.c
 
 //backup disk / swap space  size (GB)
-#define STACKBD_SIZE_G	35
+#define STACKBD_SIZE_G	48
 #define BACKUP_DISK	"/dev/sda4"
 //how may pages can be added into a single bio (128KB = 32 x 4KB)
 #define BIO_PAGE_CAP	32
@@ -117,7 +117,7 @@ enum mem_type {
 };
 
 //max_size from one server or max_size one server can provide
-#define MAX_MR_SIZE_GB 32
+#define MAX_MR_SIZE_GB 48
 
 struct IS_rdma_info {
   	uint64_t buf[MAX_MR_SIZE_GB];

@@ -798,7 +798,7 @@ static unsigned long swapin_nr_pages(unsigned long offset)
  * Caller must hold down_read on the vma->vm_mm if vma is not NULL.
  */
 struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
-			struct vm_area_struct *vma, unsigned long addr)
+															struct vm_area_struct *vma, unsigned long addr)
 {
 	struct page *page, *fault_page;
 	unsigned long entry_offset = swp_offset(entry);
@@ -813,27 +813,31 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 	mask = swapin_nr_pages(offset) - 1;
 	atomic_inc(&swapin_readahead_entry);
 
-	if( get_custom_prefetch() != 0 ) {
+	if (get_custom_prefetch() != 0)
+	{
 		int has_trend = 0, depth, major_count;
 		long major_delta;
-//		log_swap_trend(offset);
+		//		log_swap_trend(offset);
 		has_trend = find_trend(&depth, &major_delta, &major_count);
-		if(has_trend) {
+		if (has_trend)
+		{
 			int count = 0;
 			atomic_inc(&trend_found);
 			start_offset = offset;
 
 			//blk_start_plug(&plug);
-        		for (offset = start_offset; count <= mask; offset+= major_delta, count++) {
-				if (offset == entry_offset) {
+			for (offset = start_offset; count <= mask; offset += major_delta, count++)
+			{
+				if (offset == entry_offset)
+				{
 					continue;
 				}
-		                /* Ok, do the async read-ahead now */
-                		page = read_swap_cache_async_profiling(swp_entry(swp_type(entry), offset),
-                                                gfp_mask, vma, addr, offset == entry_offset);
-                		if (!page)
-                        		continue;
-                		if (offset != entry_offset)
+				/* Ok, do the async read-ahead now */
+				page = read_swap_cache_async_profiling(swp_entry(swp_type(entry), offset),
+																							 gfp_mask, vma, addr, offset == entry_offset);
+				if (!page)
+					continue;
+				if (offset != entry_offset)
 					SetPageReadahead(page);
 				page_cache_release(page);
 			}
@@ -852,18 +856,20 @@ usual:
 	/* Read a page_cluster sized and aligned cluster around offset. */
 	start_offset = offset & ~mask;
 	end_offset = offset | mask;
-	if (!start_offset)	/* First page is swap header. */
+	if (!start_offset) /* First page is swap header. */
 		start_offset++;
 
 	blk_start_plug(&plug);
-	for (offset = start_offset; offset <= end_offset ; offset++) {
+	for (offset = start_offset; offset <= end_offset; offset++)
+	{
 		// on-demand swap-in counting
-		if (offset == entry_offset) {
- 			continue;
- 		}
+		if (offset == entry_offset)
+		{
+			continue;
+		}
 		/* Ok, do the async read-ahead now */
 		page = read_swap_cache_async_profiling(swp_entry(swp_type(entry), offset),
-						gfp_mask, vma, addr, offset == entry_offset);
+																					 gfp_mask, vma, addr, offset == entry_offset);
 		if (!page)
 			continue;
 		if (offset != entry_offset)
@@ -872,7 +878,7 @@ usual:
 	}
 	blk_finish_plug(&plug);
 
-	lru_add_drain();	/* Push any new pages onto the LRU now */
+	lru_add_drain(); /* Push any new pages onto the LRU now */
 skip:
 	return fault_page;
 }
