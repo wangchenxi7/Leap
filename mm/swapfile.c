@@ -758,6 +758,34 @@ out:
 	return NULL;
 }
 
+struct swap_info_struct *try_swap_info_get(swp_entry_t entry)
+{
+	struct swap_info_struct *p;
+	unsigned long offset, type;
+
+	if (!entry.val)
+		goto out;
+	type = swp_type(entry);
+	if (type >= nr_swapfiles)
+		goto bad_nofile;
+	p = swap_info[type];
+	if (!(p->flags & SWP_USED))
+		goto bad_device;
+	offset = swp_offset(entry);
+	if (offset >= p->max)
+		goto bad_offset;
+	if (!p->swap_map[offset])
+		goto bad_free;
+	return p;
+
+bad_free:
+bad_offset:
+bad_device:
+bad_nofile:
+out:
+	return NULL;
+}
+
 static unsigned char swap_entry_free(struct swap_info_struct *p,
 				     swp_entry_t entry, unsigned char usage)
 {

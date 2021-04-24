@@ -200,6 +200,14 @@ int find_trend_in_region(int size, long *major_delta, int *major_count) {
     return count > (size/2);
 }
 
+static inline int valid_trend(int has_trend, long delta)
+{
+#define LEAP_TREND_THRESHOLD 16
+	return has_trend && delta != 0 && delta != 1 &&
+	       delta <= LEAP_TREND_THRESHOLD && delta >= -LEAP_TREND_THRESHOLD;
+#undef LEAP_TREND_THRESHOLD
+}
+
 int find_trend (int *depth, long *major_delta, int *major_count) {
     	int has_trend = 0, size = (int) atomic_read(&trend_history.max_size)/4, max_size;
 	max_size = size * 4;
@@ -210,7 +218,7 @@ int find_trend (int *depth, long *major_delta, int *major_count) {
 		size *= 2;
 	}
 	*depth = size;
-	return has_trend;
+	return valid_trend(has_trend, *major_delta);
 }
 
 void show_swap_cache_info(void)
@@ -518,53 +526,75 @@ static int is_buffer_full(void){
 	return (buffer_size <= atomic_read(&prefetch_buffer.size));
 }
 
-void add_page_to_buffer(swp_entry_t entry, struct page* page){
-	int tail, head, error=0;
-	swp_entry_t head_entry;
-	struct page* head_page;
+void add_page_to_buffer(swp_entry_t entry, struct page *page)
+{
+	int head;
+	bool find = false;
+	int trails = 0;
 
-	spin_lock_irq(&prefetch_buffer.buffer_lock);
-	inc_buffer_tail();
-	tail = get_buffer_tail();
-
-	while(is_buffer_full() && error == 0){
-//		printk("%s: buffer is full for entry: %ld, head at: %d, tail at: %d\n", __func__, entry.val, get_buffer_head(), get_buffer_tail());
+	if (!is_buffer_full()) {
+		spin_lock_irq(&prefetch_buffer.buffer_lock);
 		head = get_buffer_head();
-		head_entry = prefetch_buffer.offset_list[head];
-		head_page = prefetch_buffer.page_data[head];
-
-		if(!non_swap_entry(head_entry) && head_page){
-//			printk("%s: going to remove entry %ld with mapcount %d\n",__func__, head_entry.val, page_mapcount(head_page));
-			if (PageSwapCache(head_page) && !page_mapped(head_page) && trylock_page(head_page)) {
-				test_clear_page_writeback(head_page);
-				delete_from_swap_cache(head_page);
-				SetPageDirty(head_page);
-				unlock_page(head_page);
-//                                printk("%s: after freeing entry %ld with mapcount %d\n",__func__, head_entry.val, page_mapcount(head_page));
-				error = 1;
-			}
-			else if(page_mapcount(head_page) == 1 && trylock_page(head_page)){
-				try_to_free_swap(head_page);
-				unlock_page(head_page);
-//                                printk("%s: after freeing entry %ld with mapcount %d\n",__func__, head_entry.val, page_mapcount(head_page));
-                                error = 1;
-			}
-			else{
-//				printk("%s: failed to delete entry %ld with mapcount %d\n",__func__, head_entry.val, page_mapcount(head_page));
-				inc_buffer_tail();
-        			tail = get_buffer_tail();
-			}
-		}
-		else {
-			error = 1;
-		}
-//		printk("%s: try_to_free_swap is %s\n",__func__,(error != 0) ? "successful" : "failed");
+		prefetch_buffer.page_data[head] = page;
+		prefetch_buffer.offset_list[head] = entry;
 		inc_buffer_head();
+		inc_buffer_size();
+		spin_unlock_irq(&prefetch_buffer.buffer_lock);
+		return;
 	}
-	prefetch_buffer.offset_list[tail] = entry;
-	prefetch_buffer.page_data[tail] = page;
-	inc_buffer_size();
+	spin_lock_irq(&prefetch_buffer.buffer_lock);
+	while (!find && trails < buffer_size) {
+		struct page *victim_page = NULL;
+		swp_entry_t victim_entry;
+
+		head = get_buffer_head();
+		inc_buffer_head();
+		victim_entry = prefetch_buffer.offset_list[head];
+		victim_page = prefetch_buffer.page_data[head];
+
+		if (non_swap_entry(victim_entry) || !victim_page ||
+		    !PageSwapCache(victim_page) ||
+		    victim_entry.val != page_private(victim_page)) {
+			find = true;
+			break;
+		}
+
+		if (!page_mapped(victim_page)) {
+			get_page(victim_page);
+			if (trylock_page(victim_page)) {
+				test_clear_page_writeback(victim_page); // ??
+				delete_from_swap_cache(victim_page);
+				SetPageDirty(victim_page);
+				find = true;
+				// find = try_to_free_swap(victim_page);
+				// if (!find)
+				// 	pr_err("YIFAN: try_to_free_swap failed! page %p\n",
+				// 	       victim_page);
+				unlock_page(victim_page);
+			}
+			put_page(victim_page);
+		} else
+		if (page_mapcount(victim_page) == 1) {
+			get_page(victim_page);
+			if (trylock_page(victim_page)) {
+				find = try_to_free_swap(victim_page);
+				unlock_page(victim_page);
+			}
+			put_page(victim_page);
+		} else {
+			printk("trails: %d, page %p: mapcount %d, PageSwapCache %d\n",
+			       trails, victim_page, page_mapcount(victim_page),
+			       PageSwapCache(victim_page));
+		}
+		trails++;
+	}
 	spin_unlock_irq(&prefetch_buffer.buffer_lock);
+	prefetch_buffer.page_data[head] = page;
+	prefetch_buffer.offset_list[head] = entry;
+
+	// if (!find) {
+	// 	printk("%s: failed to free a swap cache\n", __func__);
+	// }
 }
 EXPORT_SYMBOL(add_page_to_buffer);
 
@@ -699,9 +729,9 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 			vma, addr, &page_was_allocated);
 
 	if (page_was_allocated){
-		if(get_prefetch_buffer_status() != 0){
-			add_page_to_buffer(entry, retpage);
-		}
+		// if(get_prefetch_buffer_status() != 0){
+		// 	add_page_to_buffer(entry, retpage);
+		// }
 		swap_readpage(retpage);
 	}
 
@@ -717,9 +747,9 @@ struct page *read_swap_cache_async_profiling(swp_entry_t entry, gfp_t gfp_mask,
 			vma, addr, &page_was_allocated);
 
 	if (page_was_allocated) {
-		if (get_prefetch_buffer_status() != 0) {
-			add_page_to_buffer(entry, retpage);
-		}
+		// if (get_prefetch_buffer_status() != 0) {
+		// 	add_page_to_buffer(entry, retpage);
+		// }
 		swap_readpage(retpage);
 
 		// For profiling
@@ -833,6 +863,9 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
                                                 gfp_mask, vma, addr, offset == entry_offset);
                 		if (!page)
                         		continue;
+				if (get_prefetch_buffer_status() != 0) {
+					add_page_to_buffer(swp_entry(swp_type(entry), offset), page);
+				}
                 		if (offset != entry_offset)
 					SetPageReadahead(page);
 				page_cache_release(page);
@@ -866,6 +899,9 @@ usual:
 						gfp_mask, vma, addr, offset == entry_offset);
 		if (!page)
 			continue;
+		if (get_prefetch_buffer_status() != 0) {
+			add_page_to_buffer(swp_entry(swp_type(entry), offset), page);
+		}
 		if (offset != entry_offset)
 			SetPageReadahead(page);
 		page_cache_release(page);
