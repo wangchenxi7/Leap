@@ -49,6 +49,18 @@
 #include <linux/hdreg.h>
 #include <trace/events/block.h>
 
+
+//
+// Memliner controlling macros
+
+//#define ENABLE_SWAP_CACHE_LIMIT 1
+
+// end of Memliner
+
+
+
+
+
 #define LAST_IN_BATCH sizeof(uint32_t)
 
 #define SUBMIT_HEADER_SIZE (SUBMIT_BLOCK_SIZE +	    \

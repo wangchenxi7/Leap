@@ -1,6 +1,11 @@
 #include <linux/syscalls.h>
 #include "leap.h"
 
+// memliner
+#include <linux/mm.h>
+#include <linux/swap_stats.h>
+
+
 int IS_indexes; /* num of devices created*/
 int submit_queues; // num of available cpu (also connections)
 struct list_head g_IS_sessions;
@@ -1661,6 +1666,10 @@ int IS_single_chunk_map(struct IS_session *IS_session, int select_chunk)
 	return need_chunk;
 }
 
+/**
+ * Main entrance of Leap RDMA conenction.
+ *  
+ */
 asmlinkage int sys_is_session_create(const char *portal)
 {
 	int i, j, ret;
@@ -1738,6 +1747,17 @@ asmlinkage int sys_is_session_create(const char *portal)
 	strcpy(name, "rdma_trigger_thread");
 	g_IS_session->rdma_trigger_thread = kthread_create(rdma_trigger, g_IS_session, name);
 	wake_up_process(g_IS_session->rdma_trigger_thread);
+
+	//
+	//  Memliner
+	#ifdef ENABLE_SWAP_CACHE_LIMIT
+	pr_warn("%s, Enable swap cache limit. \n", __func__);
+	activate_prefetch_buffer(1); // enable the swap cache limie
+	prefetch_buffer_init(SWAP_CACHE_PAGE_NUM_LIMIT);
+
+	#endif
+
+
 	return 0;
 
 err_destroy_conns:

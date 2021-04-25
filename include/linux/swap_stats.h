@@ -8,6 +8,24 @@
 #include <linux/swap.h>
 // #include <linux/atomic.h>
 
+//
+// memliner
+#define SWAP_CACHE_PAGE_NUM_LIMIT 8192UL  // 8K pages, 32MB
+
+
+//
+// functions
+
+extern void activate_prefetch_buffer(unsigned long val);
+extern unsigned long get_prefetch_buffer_status( void );
+extern void prefetch_buffer_init(unsigned long _size);
+extern void add_page_to_buffer(swp_entry_t entry, struct page *page);
+extern void add_page_to_buffer_yifan(swp_entry_t entry, struct page *page);
+
+// end of memliner
+
+
+
 extern atomic_t ondemand_swapin_number;
 extern atomic_t prefetch_swapin_number;
 extern atomic_t hit_on_swap_cache_number;

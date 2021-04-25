@@ -49,7 +49,7 @@ static int process_find_init(void) {
 			msleep(1000); //milisecond sleep
 	}
 	if(pid != -1) {
-		set_process_id(pid);
+		set_process_id(pid);  // ? What's the purpose of this ? is this usefull ?
 		printk("PROCESS ID set for remote I/O -> %ld\n", get_process_id());
 	}
 	else {

@@ -456,8 +456,8 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 }
 
 /* Codes related to prefetch buffer starts here*/
-unsigned long buffer_size = 8000;
-unsigned long is_prefetch_buffer_active = 0;
+unsigned long buffer_size = SWAP_CACHE_PAGE_NUM_LIMIT; // number of pages
+unsigned long is_prefetch_buffer_active = 0; // enable swap cache limit in default 
 
 void activate_prefetch_buffer(unsigned long val){
     is_prefetch_buffer_active = val;
@@ -518,6 +518,13 @@ static int is_buffer_full(void){
 	return (buffer_size <= atomic_read(&prefetch_buffer.size));
 }
 
+
+
+
+/**
+ * Count the number of pages in cache, if exceed the limit, start swap cache claiming.
+ *  
+ */
 void add_page_to_buffer(swp_entry_t entry, struct page* page){
 	int tail, head, error=0;
 	swp_entry_t head_entry;
@@ -527,6 +534,7 @@ void add_page_to_buffer(swp_entry_t entry, struct page* page){
 	inc_buffer_tail();
 	tail = get_buffer_tail();
 
+	// block the prefetching until any page is freed from swap cache.
 	while(is_buffer_full() && error == 0){
 //		printk("%s: buffer is full for entry: %ld, head at: %d, tail at: %d\n", __func__, entry.val, get_buffer_head(), get_buffer_tail());
 		head = get_buffer_head();
@@ -567,6 +575,89 @@ void add_page_to_buffer(swp_entry_t entry, struct page* page){
 	spin_unlock_irq(&prefetch_buffer.buffer_lock);
 }
 EXPORT_SYMBOL(add_page_to_buffer);
+
+
+
+
+/**
+ * Count the number of pages in cache, if exceed the limit, start swap cache claiming.
+ * yifan verson. 
+ * 
+ */
+void add_page_to_buffer_yifan(swp_entry_t entry, struct page *page)
+{
+	int head;
+	bool find = false;
+	int trails = 0;
+
+	if (!is_buffer_full()) {
+		spin_lock_irq(&prefetch_buffer.buffer_lock);
+		head = get_buffer_head();
+		prefetch_buffer.page_data[head] = page;
+		prefetch_buffer.offset_list[head] = entry;
+		inc_buffer_head();
+		inc_buffer_size();
+		spin_unlock_irq(&prefetch_buffer.buffer_lock);
+		return;
+	}
+	spin_lock_irq(&prefetch_buffer.buffer_lock);
+	while (!find && trails < buffer_size) {
+		struct page *victim_page = NULL;
+		swp_entry_t victim_entry;
+
+		head = get_buffer_head();
+		inc_buffer_head();
+		victim_entry = prefetch_buffer.offset_list[head];
+		victim_page = prefetch_buffer.page_data[head];
+
+		if (non_swap_entry(victim_entry) || !victim_page ||
+		    !PageSwapCache(victim_page) ||
+		    victim_entry.val != page_private(victim_page)) {
+			find = true;
+			break;
+		}
+
+		if (!page_mapped(victim_page)) {
+			get_page(victim_page);
+			if (trylock_page(victim_page)) {
+				test_clear_page_writeback(victim_page); // ??
+				delete_from_swap_cache(victim_page);
+				SetPageDirty(victim_page);
+				find = true;
+				// find = try_to_free_swap(victim_page);
+				// if (!find)
+				// 	pr_err("YIFAN: try_to_free_swap failed! page %p\n",
+				// 	       victim_page);
+				unlock_page(victim_page);
+			}
+			put_page(victim_page);
+		} else
+		if (page_mapcount(victim_page) == 1) {
+			get_page(victim_page);
+			if (trylock_page(victim_page)) {
+				find = try_to_free_swap(victim_page);
+				unlock_page(victim_page);
+			}
+			put_page(victim_page);
+		} else {
+			printk("trails: %d, page %p: mapcount %d, PageSwapCache %d\n",
+			       trails, victim_page, page_mapcount(victim_page),
+			       PageSwapCache(victim_page));
+		}
+		trails++;
+	}
+	spin_unlock_irq(&prefetch_buffer.buffer_lock);
+	prefetch_buffer.page_data[head] = page;
+	prefetch_buffer.offset_list[head] = entry;
+
+	// if (!find) {
+	// 	printk("%s: failed to free a swap cache\n", __func__);
+	// }
+}
+EXPORT_SYMBOL(add_page_to_buffer_yifan);
+
+
+
 
 /* static void delete_page_from_buffer(swp_entry_t entry){
     return;
@@ -700,7 +791,8 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 
 	if (page_was_allocated){
 		if(get_prefetch_buffer_status() != 0){
-			add_page_to_buffer(entry, retpage);
+			//add_page_to_buffer(entry, retpage);
+			add_page_to_buffer_yifan(entry, retpage);
 		}
 		swap_readpage(retpage);
 	}
@@ -718,7 +810,8 @@ struct page *read_swap_cache_async_profiling(swp_entry_t entry, gfp_t gfp_mask,
 
 	if (page_was_allocated) {
 		if (get_prefetch_buffer_status() != 0) {
-			add_page_to_buffer(entry, retpage);
+			//add_page_to_buffer(entry, retpage); // count the number of prefetching pages
+			add_page_to_buffer_yifan(entry, retpage);
 		}
 		swap_readpage(retpage);
 
@@ -798,7 +891,7 @@ static unsigned long swapin_nr_pages(unsigned long offset)
  * Caller must hold down_read on the vma->vm_mm if vma is not NULL.
  */
 struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
-															struct vm_area_struct *vma, unsigned long addr)
+		struct vm_area_struct *vma, unsigned long addr)
 {
 	struct page *page, *fault_page;
 	unsigned long entry_offset = swp_offset(entry);

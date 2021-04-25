@@ -32,9 +32,13 @@ void set_process_id(unsigned long __pid){
 //        printk(KERN_INFO "process id at swap_state set to %ld at address %p\n", process_id, &process_id);
 }
 
+// are you ok ?
+// the recorded pid is uselss.
 unsigned long get_process_id(){
 //        printk(KERN_INFO "process id from swap_state is %ld at address %p\n", process_id, &process_id);
-        return process_id;
+        //return process_id;
+
+	return 1; // non zero, to always enable Leap swap
 }
 EXPORT_SYMBOL(set_process_id);
 EXPORT_SYMBOL(get_process_id);
