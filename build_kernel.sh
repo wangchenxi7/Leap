@@ -91,9 +91,9 @@ then
     sleep 1
     make oldconfig
 
-    echo "make -j16"
+    echo "make -j`nproc`"
     sleep 1
-    make -j16
+    make -j`nproc`
 
 elif [ "${op}" = "delete" ]
 then
