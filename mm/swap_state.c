@@ -457,7 +457,7 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 
 /* Codes related to prefetch buffer starts here*/
 unsigned long buffer_size = SWAP_CACHE_PAGE_NUM_LIMIT; // number of pages
-unsigned long is_prefetch_buffer_active = 0; // enable swap cache limit in default 
+unsigned long is_prefetch_buffer_active = 1; // enable swap cache limit in default
 
 void activate_prefetch_buffer(unsigned long val){
     is_prefetch_buffer_active = val;
@@ -523,7 +523,7 @@ static int is_buffer_full(void){
 
 /**
  * Count the number of pages in cache, if exceed the limit, start swap cache claiming.
- *  
+ *
  */
 void add_page_to_buffer(swp_entry_t entry, struct page* page){
 	int tail, head, error=0;
@@ -581,8 +581,8 @@ EXPORT_SYMBOL(add_page_to_buffer);
 
 /**
  * Count the number of pages in cache, if exceed the limit, start swap cache claiming.
- * yifan verson. 
- * 
+ * yifan verson.
+ *
  */
 void add_page_to_buffer_yifan(swp_entry_t entry, struct page *page)
 {
