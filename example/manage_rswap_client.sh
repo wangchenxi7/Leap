@@ -7,10 +7,10 @@
 SWAP_PARTITION_SIZE="48G"
 
 # Cause of sudo, NOT use ${HOME}
-home_dir="/mnt/ssd/nvme"
+home_dir="/mnt/ssd/yifan"
 swap_file="${home_dir}/swapfile"
-connect_exe="${home_dir}/Leap/example/connect_to_server.o"
-leap_ko="${home_dir}/Leap/example/leap_functionality.ko"
+connect_exe="syscaller"
+leap_ko="leap_functionality.ko"
 
 ##
 # Do the action
@@ -87,7 +87,7 @@ function connect_to_server () {
 	if [ -z "${connect_exe}" ]
 	then
 		echo "Compile the connect syscall"
-		gcc ${home_dir}/Leap/example/syscaller.c  -o ${home_dir}/Leap/example/connect_to_server.o
+		gcc syscaller.c -o syscaller
 	fi
 
 	# Connect to memory server

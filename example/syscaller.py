@@ -13,7 +13,7 @@ def is_session_create():
 
     ipport = ctypes.c_char_p("rdma://1,10.0.0.4:9400")
 
-    return syscall(SYS_RESET_SWAP_STAT, ipport)
+    return syscall(SYS_IS_SESSION_CREATE, ipport)
 
 
 def main():
