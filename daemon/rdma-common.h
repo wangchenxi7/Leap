@@ -33,7 +33,7 @@
 #ifdef USER_MAX_CLIENT
   #define MAX_CLIENT	USER_MAX_CLIENT
 #else
-  #define MAX_CLIENT	32
+  #define MAX_CLIENT	96
 #endif
 
 #define EXTRA_CHUNK_NUM 2
