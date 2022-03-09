@@ -53,7 +53,7 @@
 //
 // Memliner controlling macros
 
-//#define ENABLE_SWAP_CACHE_LIMIT 1
+#define ENABLE_SWAP_CACHE_LIMIT 1
 
 // end of Memliner
 
