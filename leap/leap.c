@@ -1670,10 +1670,11 @@ int IS_single_chunk_map(struct IS_session *IS_session, int select_chunk)
  * Main entrance of Leap RDMA conenction.
  *  
  */
-asmlinkage int sys_is_session_create(const char *portal)
+asmlinkage int sys_is_session_create(const char *portal_user)
 {
 	int i, j, ret;
 	char name[20];
+	char *portal = "rdma://1,10.0.0.3:9400";
 
 	g_IS_session = (struct IS_session *) kzalloc(sizeof(struct IS_session), GFP_KERNEL);	
 	printk(KERN_ALERT "In IS_session_create() with portal: %s\n", portal);
