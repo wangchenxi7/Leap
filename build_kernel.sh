@@ -35,8 +35,8 @@ delete_old_kernel_contents () {
 install_new_kernel_contents () {
     echo "install kernel modules"
     sleep 1
-    sudo make headers_install
-    sudo make modules_install
+    sudo make -j `nproc` headers_install
+    sudo make -j `nproc` modules_install
 
     echo "install kernel image"
     sleep 1
